@@ -1,72 +1,91 @@
-const express = require("express");
-const app = express();
-const mysql = require("mysql2-promise")();
-const session = require("express-session");
+const mysql = require("mysql2/promise");
+const ResultSetHeader =  require("mysql2");
 
-app.use(express.json());
+module.exports = async function createDatabase() {
+  const connection = await mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "password",
+    database: "office",
+  });
 
-app.use(
-  session({
-    secret: "keyboard cat",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+  return {
+    //create table
+    createTable: async function () {
+      let sql =
+        "CREATE TABLE employeess (id int AUTO_INCREMENT NOT NULL, user_name VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, user_role VARCHAR(40) NOT NULL, designation VARCHAR(255) NOT NULL, PRIMARY KEY(id) )";
+        
+      const response = await connection.execute(sql);
+      
+      function isTableCreated(){
+        if(sql==='')
+          return false;
+        else 
+          return true;
+      }
+      console.log("Inside sql");
+      console.log(typeof(sql));
+      return response;
+    },
+    //addEmployee --Register
+    userRegister: async function (user_name, password, user_role, designation) {
+      const sql =
+        "INSERT INTO employee(user_name, password, user_role, designation) values(?,?,?,?)";
 
-const db = function createDatabase() {
-  try {
-    mysql.configure({
-      host: "localhost",
-      user: "root",
-      password: "password",
-      database: "office",
-    });
+      const [resp] = await connection.execute(sql, [
+        user_name,
+        password,
+        user_role,
+        designation,
+      ]);
 
-    //login
-    return {
-      getUserNameAndPassword: async function (user_name, password) {
-        // console.log("Inside database");
-        //const [rows] = await mysql.execute('SELECT * FROM employee WHERE user_name = ? AND password = ?', [user_name, password]);
+      return resp.insertId;
+    },
 
-        const sql = await mysql.execute(
-          "SELECT * FROM employee WHERE user_name = ? AND password = ?",
-          [user_name, password]
-        );
-        // console.log(sql);
-        const query = db.query(sql, [user_name, password], (err, results) => {
-          console.log("asd");
-          if (err) {
-            console.log(err);
-            res.status(500).send("Internal server error");
-          }
-          //console.log({results});
-          const fetchUserRole = results[0].user_role;
+    //getAllEmployee with password
+    getAllEmployeesWithPassword: async function () {
+      const sql = "SELECT * FROM employee";
+      const [rows] = await connection.execute(sql);
+      return rows;
+    },
 
-          if (results.length !== 0 && fetchUserRole === "user") {
-            console.log("User Login Successfull");
-            req.session.isLoggedIn = true;
-            req.session.userRole = results[0].user_role;
+    //getAllEmployee without password
+    getAllEmployeesWithoutPassword: async function () {
+      const sql =
+        "SELECT user_name,password, user_role, designation FROM employee";
 
-            return res.status(200).send("User LoggedIn");
-          } else if (results.length !== 0 && fetchUserRole === "admin") {
-            console.log("Admin Login Successfull");
-            req.session.isLoggedIn = true;
-            req.session.userRole = results[0].user_role;
+        const [rows] = await connection.execute(sql);
+        return rows;
+    },
 
-            return res.status(200).send("Admin LoggedIn");
-          } else {
-            console.log("Wrong info");
+    // get a employee by id
+    getAEmployeeById: async function (id) {
+      const sql = "SELECT * FROM employee WHERE id=?";
+        const [employees] = await connection.execute(sql, [id]);
 
-            return res.status(403).send("Invalid Username or password");
-          }
-        });
+        return employees[0];
+    },
 
-        return rows[0];
-      },
-    };
-  } catch (error) {
-    console.error(error);
-  }
+    // update employee
+    updateEmployee: async function(user_name,designation,id){
+      const sql = "UPDATE employee SET user_name=?, designation=? WHERE id=?";
+
+        const [employee] = await connection.execute<ResultSetHeader>(sql, [user_name,designation,id]);
+        return employee;
+    },
+    // delete Employee
+    deleteEmployee: async function(id){
+      let sql = `DELETE FROM employee WHERE id = ?`;
+        await connection.execute(sql,[id]);
+    },
+    // login
+    getUser: async function (user_name) {
+      const [rows, fields] = await connection.execute(
+        "SELECT * FROM employee WHERE user_name = ?",
+        [user_name]
+      );
+
+      return rows[0];
+    },
+  };
 };
-
-module.exports = db;
