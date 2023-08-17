@@ -1,5 +1,7 @@
 const mysql = require("mysql2/promise");
-const ResultSetHeader =  require("mysql2");
+const session = require("express-session");
+const express = require("express");
+const app = express();
 
 module.exports = async function createDatabase() {
   const connection = await mysql.createConnection({
@@ -9,23 +11,22 @@ module.exports = async function createDatabase() {
     database: "office",
   });
 
+  app.use(
+    session({
+      secret: "keyboard cat",
+      resave: false,
+      saveUninitialized: true,
+    })
+  );
+
   return {
     //create table
     createTable: async function () {
       let sql =
-        "CREATE TABLE employeess (id int AUTO_INCREMENT NOT NULL, user_name VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, user_role VARCHAR(40) NOT NULL, designation VARCHAR(255) NOT NULL, PRIMARY KEY(id) )";
+        "CREATE TABLE employees (id int AUTO_INCREMENT NOT NULL, user_name VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, user_role VARCHAR(40) NOT NULL, designation VARCHAR(255) NOT NULL, PRIMARY KEY(id) )";
         
-      const response = await connection.execute(sql);
-      
-      function isTableCreated(){
-        if(sql==='')
-          return false;
-        else 
-          return true;
-      }
-      console.log("Inside sql");
-      console.log(typeof(sql));
-      return response;
+      const [response] = await connection.execute(sql);
+      return response.serverStatus;
     },
     //addEmployee --Register
     userRegister: async function (user_name, password, user_role, designation) {
@@ -52,7 +53,7 @@ module.exports = async function createDatabase() {
     //getAllEmployee without password
     getAllEmployeesWithoutPassword: async function () {
       const sql =
-        "SELECT user_name,password, user_role, designation FROM employee";
+        "SELECT user_name, user_role, designation FROM employee";
 
         const [rows] = await connection.execute(sql);
         return rows;
@@ -70,13 +71,14 @@ module.exports = async function createDatabase() {
     updateEmployee: async function(user_name,designation,id){
       const sql = "UPDATE employee SET user_name=?, designation=? WHERE id=?";
 
-        const [employee] = await connection.execute<ResultSetHeader>(sql, [user_name,designation,id]);
+        const [employee] = await connection.execute(sql, [user_name,designation,id]);
         return employee;
     },
     // delete Employee
     deleteEmployee: async function(id){
       let sql = `DELETE FROM employee WHERE id = ?`;
-        await connection.execute(sql,[id]);
+        const [employee] = await connection.execute(sql,[id]);
+        return employee;
     },
     // login
     getUser: async function (user_name) {
