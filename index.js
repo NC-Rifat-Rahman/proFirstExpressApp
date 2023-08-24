@@ -1,5 +1,7 @@
 const express = require("express");
 const createDatabase = require("./database");
+const configureSession = require('./session');
+// const sessionMiddleware = require('./session');
 
 const createEmployeeRouter = require("./employee-router");
 
@@ -9,10 +11,10 @@ const createEmployeeRouter = require("./employee-router");
     const app = express();
 
     app.use(express.json());
+    const session = configureSession(app);
 
-    const employeeRouter = createEmployeeRouter({ db });
-    
-    console.log("Inside Index");
+    const employeeRouter = createEmployeeRouter({ db, session });
+
     app.use("/employee", employeeRouter);
 
     app.listen("5000", () => {

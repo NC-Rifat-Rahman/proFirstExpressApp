@@ -1,6 +1,6 @@
 const mysql = require("mysql2/promise");
-const session = require("express-session");
 const express = require("express");
+const bcrypt = require ("bcryptjs")
 const app = express();
 
 module.exports = async function createDatabase() {
@@ -11,31 +11,27 @@ module.exports = async function createDatabase() {
     database: "office",
   });
 
-  app.use(
-    session({
-      secret: "keyboard cat",
-      resave: false,
-      saveUninitialized: true,
-    })
-  );
-
   return {
     //create table
     createTable: async function () {
       let sql =
-        "CREATE TABLE employees (id int AUTO_INCREMENT NOT NULL, user_name VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, user_role VARCHAR(40) NOT NULL, designation VARCHAR(255) NOT NULL, PRIMARY KEY(id) )";
+        "CREATE TABLE employee (id int AUTO_INCREMENT NOT NULL, user_name VARCHAR(255) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, user_role VARCHAR(40) NOT NULL, designation VARCHAR(255) NOT NULL, PRIMARY KEY(id) )";
         
       const [response] = await connection.execute(sql);
       return response.serverStatus;
     },
+
     //addEmployee --Register
     userRegister: async function (user_name, password, user_role, designation) {
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(password,salt);
+
       const sql =
         "INSERT INTO employee(user_name, password, user_role, designation) values(?,?,?,?)";
 
       const [resp] = await connection.execute(sql, [
         user_name,
-        password,
+        hashedPassword,
         user_role,
         designation,
       ]);
@@ -82,12 +78,19 @@ module.exports = async function createDatabase() {
     },
     // login
     getUser: async function (user_name) {
-      const [rows, fields] = await connection.execute(
-        "SELECT * FROM employee WHERE user_name = ?",
-        [user_name]
-      );
+
+      const sql = "SELECT * FROM employee WHERE user_name = ?"; 
+      const [rows, fields] = await connection.execute(sql,[user_name]);
 
       return rows[0];
     },
+
+    // get user role
+    getUserRole: async function(user_role){
+      const sql = "SELECT * FROM employee WHERE user_role = ?";
+      const [rows, feilds] = await connection.execute(sql,[user_role]);
+
+      return rows[0];
+    }
   };
 };

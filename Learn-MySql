@@ -1,0 +1,63 @@
+## THEORY
+# SELECT Clause
+- We can use arithmetic operations on columns
+- We can use "AS" to change alias name of a column
+- Use 'DISTINCT' to fethch non-duplicate records
+
+# WHERE Clause
+- use it to apply conditions
+
+# AND, OR NOT Operator
+- AND has higher order than OR. That means if query has both AND and OR operator the AND operator will be excuted first. 
+    We can change the order using paranthesis.
+- NOT is used to negate a condition.
+
+# IN Operator
+- An example : 
+    SELECT * FROM Customers WHERE state = "VA" OR state = "GA" OR state = "FL"
+    By using IN operator the equivalent query will be
+    SELECT * FROM Customers WHERE state IN ('VA','FL','GA')
+
+# BETWEEN Operator
+- An example :
+    SELECT * FROM customers WHERE points >= 1000 AND points <= 3000
+    By using BETWEEN operator the equivalent quer will be
+    SELECT * FROM customer WHERE points BETWEEN 1000 AND 3000
+
+# LIKE Operator
+- An example : 
+    SELECT * FROM customers WHERE last_name LIKE 'b%'. [It will give results where customers last name starts with B]
+    SELECT * FROM customers WHERE last_name LIKE '%b%'. [It will give results where customers last name contains b in nay place of the last name]
+    SELECT * FROM customers WHERE last_name LIKE '%b'. [It will give results where customers last name ends with b]
+
+    SELECT * FROM customers WHERE last_name LIKE '_____y'. [It will give results where lastname contains exact numbers of characters as underscore and followed by y]
+
+- (%) represents any number of characters && (_) represents single character
+
+# REGEXP Operator
+- It is powerful when searching for strings.
+- An example : 
+    SELECT * FROM customers WHERE last_name LIKE '&field'
+    Equivalent to : 
+    SELECT * FROM customers WHERE last_name REGEXP 'field'
+- it has (^) ($) (|) signs. [Google for further info]
+- ^ beginning of the string, $ end of the string, | logical OR, [] to match any single charcter listed in the bracket
+
+
+
+
+
+** Exercise
+* REGEXP
+- Get the customers whose 
+    1) first names are ELKA or AMBUR
+    2) last names end with EY or ON
+    3) last names start with MY or contains SE
+    4) last names contain B followed by R or U
+
+&& Solutions
+& REGEXP
+    1) SELECT * FROM customers WHERE first_name REGEXP 'ELKA | AMBUR'
+    2) SELECT * FROM customers WHERE last_name REGEXP 'EY$ | ON$'
+    3) SElECT * FROM customers WHERE last_name REGEXP '^MY | SE'
+    4) SELECT * FROM customers WHERE last_name 'b[ru]' or use [br|bu]

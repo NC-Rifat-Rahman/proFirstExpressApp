@@ -1,10 +1,98 @@
 const express = require("express");
-
+// const session = require("express-session");
+const session = require("./session");
+const bcrypt = require("bcryptjs");
 
 function createEmployeeRouter(dependencies) {
   const router = express.Router();
-  const { db } = dependencies;
 
+  const { db, session } = dependencies;
+
+  function isCorrectPassword(user, password) {
+    return bcrypt.compareSync(password, user.password);
+  }
+
+  function updateUserLoginSession(req, user) {
+    session.setUserLogin(req);
+    session.setUserRole(req, user.user_role);
+  }
+
+  // login
+  router.post("/login", async (req, res) => {
+    const { user_name, user_role } = req.body;
+
+    const user = await db.getUser(user_name);
+
+    if (isCorrectPassword(user, req.body.password)) {
+      updateUserLoginSession(req, user);
+      return res.status(200).send(`${user.user_role} Logged In`);
+    } else {
+      return res.status(400).send("Invalid UserName or Password");
+    }
+
+    const fetchUserRole = user.user_role;
+
+    //const useSession = session
+
+    if (hashedPassword === true) {
+      const x = session.setUserLogin(req);
+      const y = session.setUserRole(req, user.user_role);
+      // console.log({x});
+      console.log({ y });
+
+      console.log(`Inside ${user.user_role} login`);
+
+      if (y === "admin") {
+        const z = session.isAdminLoggedIn(req);
+        console.log({ z });
+      } else {
+        const zz = session.isUserLoggedIn(req);
+        console.log({ zz });
+      }
+
+      return res.status(200).send(`${user.user_role} Logged In`);
+    } else {
+      return res.status(400).send("Invalid UserName or Password");
+    }
+  });
+
+  // logout
+  router.delete("/logout", (req, res) => {
+    req.session.destroy();
+    res.send("logout");
+  });
+
+  // // middleware to check if user is loggedin to access pages
+  // router.use((req, res, next) => {
+  //   if (session.isUserLoggedIn) {
+  //     console.log("User loged in");
+  //     //console.log(results);
+  //     next();
+  //   }
+  //   else if(session.isAdminLoggedin){
+  //     console.log("Admin loged in");
+  //     next();
+  //   }
+  //   else {
+  //     console.log("Forbidden access");
+  //     return res.status(403).send("Forbidden access");
+  //   }
+  // });
+
+  // to authorize access
+  function isAdmin(req) {
+    const { user_role } = req.body;
+    const a = session.setUserRole(req, user_role);
+    console.log(a);
+
+    const x = session.isAdminLoggedIn(req);
+    console.log({ x });
+    if (x) {
+      return true;
+    } else {
+      return false;
+    }
+  }
   // router.use((req, res, next) => {
 
   // });
@@ -12,11 +100,12 @@ function createEmployeeRouter(dependencies) {
   // create table
   router.get("/createEmployee", async (req, res) => {
     try {
-      console.log("Inside try");
+      if (!session.isAdminLoggedin) {
+        return res.status(403).send("Forbidden access");
+      }
       const createTable = await db.createTable();
       return res.status(200).send("Table created");
     } catch (error) {
-      console.log("Inside catch");
       if (error.code === "ER_TABLE_EXISTS_ERROR") {
         return res.status(400).send("Table already exists!");
       }
@@ -28,6 +117,9 @@ function createEmployeeRouter(dependencies) {
   router.post("/addEmployee", async (req, res) => {
     // faced weird problem
     try {
+      if (!session.isAdminLoggedIn(req)) {
+        return res.status(403).send("Forbidden access");
+      }
       const { user_name, password, user_role, designation } = req.body;
 
       const employeeId = await db.userRegister(
@@ -47,23 +139,25 @@ function createEmployeeRouter(dependencies) {
     }
   });
 
-  // login
-  router.post("/login", async (req, res) => {
-    const { user_name, password } = req.body;
+  // dashboard
+  router.get("/dashboard", (req, res) => {
 
-    const user = await db.getUser(user_name);
+    console.log(req.session);
+    console.log(!session.isAdminLoggedIn(req));
 
-    console.log("Inside router");
-    if (password === user.password) {
-      return res.status(200).send("Logged In");
-    } else {
-      return res.status(400).send("Invalid UserName or Password");
+    if (!session.isAdminLoggedIn(req)) {
+      return res.status(403).send("Forbidden access");
     }
+    return res.status(200).send("OKAY");
   });
 
   // get all employee
   router.get("/getEmployee", async (req, res) => {
     try {
+      if (!session.isAdminLoggedIn(req)) {
+        return res.status(403).send("Forbidden access");
+      }
+
       const employees = await db.getAllEmployeesWithoutPassword();
       return res.status(200).send(employees);
     } catch (error) {
@@ -75,6 +169,10 @@ function createEmployeeRouter(dependencies) {
   // get a employee by id
   router.get("/getEmployee/:id", async (req, res) => {
     try {
+      if (!session.isAdminLoggedIn(req)) {
+        return res.status(403).send("Forbidden access");
+      }
+
       const id = req.params.id;
       const employee = await db.getAEmployeeById(id);
 
@@ -96,6 +194,9 @@ function createEmployeeRouter(dependencies) {
   // update employee
   router.put("/updateEmployee/:id", async (req, res) => {
     try {
+      if (!session.isAdminLoggedIn(req)) {
+        return res.status(403).send("Forbidden access");
+      }
       const { id } = req.params;
       const { user_name, designation } = req.body;
 
@@ -122,6 +223,10 @@ function createEmployeeRouter(dependencies) {
   // delete employee
   router.delete("/deleteEmployee/:id", async (req, res) => {
     try {
+      if (!session.isAdminLoggedIn(req)) {
+        return res.status(403).send("Forbidden access");
+      }
+
       const id = req.params.id;
       const deleteEmployee = await db.deleteEmployee(id);
 
