@@ -3,11 +3,15 @@ const express = require("express");
 const session = require("./session");
 const bcrypt = require("bcryptjs");
 
+const NodeCache = require( "node-cache" );
+const myCache = new NodeCache();
+
 function createEmployeeRouter(dependencies) {
   const router = express.Router();
 
   const { db, session } = dependencies;
 
+   // ----------------------//
   function isCorrectPassword(user, password) {
     return bcrypt.compareSync(password, user.password);
   }
@@ -15,44 +19,51 @@ function createEmployeeRouter(dependencies) {
   function updateUserLoginSession(req, user) {
     session.setUserLogin(req);
     session.setUserRole(req, user.user_role);
+    session.setUserId(req, user.id);
   }
+     // ----------------------//
 
   // login
   router.post("/login", async (req, res) => {
+    const { id } = req.params;
     const { user_name, user_role } = req.body;
 
     const user = await db.getUser(user_name);
+    // console.log(user);
+    let userId = req.session.currentUserId;
+    userId = user.id;
+    // console.log({userId});
 
     if (isCorrectPassword(user, req.body.password)) {
       updateUserLoginSession(req, user);
+
       return res.status(200).send(`${user.user_role} Logged In`);
     } else {
       return res.status(400).send("Invalid UserName or Password");
     }
+  });
 
-    const fetchUserRole = user.user_role;
+  // get current user
+  router.get("/getCurrentEmployee", async (req, res) => {
+    try {
+      const currentEmployeeId = session.getUserId(req);
+      console.log({currentEmployeeId});
+      const employee = await db.getAEmployeeById(currentEmployeeId);
+      return res.status(200).send(employee);
 
-    //const useSession = session
+      // if(session.setUserLogin(req)){
 
-    if (hashedPassword === true) {
-      const x = session.setUserLogin(req);
-      const y = session.setUserRole(req, user.user_role);
-      // console.log({x});
-      console.log({ y });
-
-      console.log(`Inside ${user.user_role} login`);
-
-      if (y === "admin") {
-        const z = session.isAdminLoggedIn(req);
-        console.log({ z });
-      } else {
-        const zz = session.isUserLoggedIn(req);
-        console.log({ zz });
-      }
-
-      return res.status(200).send(`${user.user_role} Logged In`);
-    } else {
-      return res.status(400).send("Invalid UserName or Password");
+      //   return res.status(200).send("OKAY");
+      // }
+      return res.status(400).send("No employee found");
+    } catch (error) {
+      console.error(error);
+  
+      // if (error === "EMPLOYEE_NOT_FOUND") {
+      //   return res.status(400).send("No employee found");
+      // }
+  
+      return res.status(500).send("Internal Server Error");
     }
   });
 
@@ -113,18 +124,40 @@ function createEmployeeRouter(dependencies) {
     }
   });
 
-  // AddEmployee --Register
+  // Register
+  router.post("/register", async (req, res) => {
+    // faced weird problem
+    try {
+      const { user_name, password, user_role, designation } = req.body;
+
+      const employeeId = await db.userRegister(
+        user_name,
+        password,
+        user_role,
+        designation
+      );
+      return res.status(200).send({ message: "Register Successfull!", employeeId });
+    } catch (error) {
+      console.error(error);
+
+      if (error.code === "ER_DUP_ENTRY") {
+        return res.status(400).send("USER ID EXISTS");
+      }
+      return res.status(500).send("Internal Server Error");
+    }
+  });
+
+  // addEmployee
   router.post("/addEmployee", async (req, res) => {
     // faced weird problem
     try {
       if (!session.isAdminLoggedIn(req)) {
         return res.status(403).send("Forbidden access");
       }
-      const { user_name, password, user_role, designation } = req.body;
+      const { user_name, user_role, designation } = req.body;
 
-      const employeeId = await db.userRegister(
+      const employeeId = await db.addEmployee(
         user_name,
-        password,
         user_role,
         designation
       );
@@ -138,7 +171,6 @@ function createEmployeeRouter(dependencies) {
       return res.status(500).send("Internal Server Error");
     }
   });
-
   // dashboard
   router.get("/dashboard", (req, res) => {
 
@@ -153,18 +185,21 @@ function createEmployeeRouter(dependencies) {
 
   // get all employee
   router.get("/getEmployee", async (req, res) => {
+    
     try {
       if (!session.isAdminLoggedIn(req)) {
         return res.status(403).send("Forbidden access");
       }
-
-      const employees = await db.getAllEmployeesWithoutPassword();
-      return res.status(200).send(employees);
+     
+        const employees = await db.getAllEmployeesWithoutPassword();
+        return res.status(201).send(employees);
+      
     } catch (error) {
       console.error(error);
       return res.status(500).send("Internal Server Error");
     }
   });
+
 
   // get a employee by id
   router.get("/getEmployee/:id", async (req, res) => {
@@ -220,14 +255,46 @@ function createEmployeeRouter(dependencies) {
     }
   });
 
+    // update password
+    router.put("/updateEmployeePassword/:id", async (req, res) => {
+      try {
+
+        const { id } = req.params;
+        const { password } = req.body;
+        bcrypt.compareSync(req.body.password,password);
+  
+        const updateEmployee = await db.updateEmployeePassword(
+          password,
+          id
+        );
+  
+        if (updateEmployee.affectedRows === 0) {
+          throw "Id_not_found";
+        }
+        return res.status(201).send("Employee Password Updated");
+      } catch (error) {
+        console.error(error);
+  
+        if (error === "Id_not_found") {
+          return res.status(400).send("User does not exist!");
+        }
+        return res.status(500).send("Internal Server Error");
+      }
+    });
+
   // delete employee
   router.delete("/deleteEmployee/:id", async (req, res) => {
     try {
       if (!session.isAdminLoggedIn(req)) {
         return res.status(403).send("Forbidden access");
       }
-
       const id = req.params.id;
+      const employeeDetails = await db.getAEmployeeById(id)
+
+      if(employeeDetails.user_role === "admin"){
+        return res.status(400).send("Admins cannot be deleted!")
+      }
+
       const deleteEmployee = await db.deleteEmployee(id);
 
       if (deleteEmployee.affectedRows === 0) {
